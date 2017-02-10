@@ -9,5 +9,9 @@ if __name__ == '__main__':
   with open(sys.argv[1]) as fin:
     for line in fin:
       arr = line.strip('\n').split('\t')
+
       if not all(x.isupper() for x in arr[0]) and all(good_char(x) for x in arr[0]):
-        print(line.strip('\n'))
+        # if backtranslation is empty, set it to the translation
+        if arr[3] == '':
+          arr[3] = arr[1]
+        print('\t'.join(arr))

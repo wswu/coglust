@@ -10,7 +10,7 @@ import editdistance
 import config
 import weightedlev
 
-weights = [0.35, 0.25, 0.2, 0.2, 0.1]
+weights = [0.35, 0.35, 0.1, 0.1, 0.1]
 
 def inter_dist(w1, w2):
   if w1.lang == w2.lang:
@@ -35,7 +35,8 @@ def weighted_dist(w1, w2):
     0 if len(w1.meaning_ids.intersection(w2.meaning_ids)) > 0 else 1
   ]
 
-  print(w1.foreign + '/' + w1.lang, w2.foreign + '/' + w2.lang, features)
+  #print(w1.foreign + '/' + w1.lang, w2.foreign + '/' + w2.lang, features)
+  #print('score', np.inner(features, weights), 'threshold', threshold)
 
   return np.inner(features, weights)
 
@@ -64,12 +65,13 @@ def read_combined_table(filename):
     words = []
     for line in fin:
       f, e, lang, backtrans, pos, meaning_ids = line.strip('\n').split('\t')
+      pos = set(pos.split('/'))
       meaning_ids = set(meaning_ids.split('/'))
       words.append(Word(f, e, lang, backtrans, pos, meaning_ids))
     return words
 
 
-def cluster(words):
+def cluster(words, linkage_method):
   '''
   distance_func and threshold are global vars!
   '''
@@ -84,23 +86,50 @@ def cluster(words):
     triu = np.triu_indices(len(words), 1)
     distances = np.apply_along_axis(dist, 0, triu)
 
-    linkage_matrix = linkage(distances, method='single')
+    linkage_matrix = linkage(distances, method=linkage_method)
     clusters = fcluster(linkage_matrix, threshold, criterion='distance')
 
   return clusters
 
 
-def run(all_words, output_file):
+def cluster_and_plot(words, linkage_method):
+  '''
+  distance_func and threshold are global vars!
+  '''
+
+  if len(words) == 1:
+    clusters = [1]
+  else:
+    def dist(pair):
+      i, j = pair
+      return distance_func(words[i], words[j])
+
+    triu = np.triu_indices(len(words), 1)
+    print(triu)
+    distances = np.apply_along_axis(dist, 0, triu)
+    print('distances:', distances)
+
+    for link_method in ['single', 'average', 'complete']:
+      linkage_matrix = linkage(distances, method=link_method)
+      clusters = fcluster(linkage_matrix, threshold, criterion='distance')
+
+      plot(words, linkage_matrix, link_method, 0.0)
+
+  return clusters
+
+
+def run(all_words, linkage_method, output_file):
   with open(output_file, 'w') as fout:
     for eng, words in groupby(all_words, key=lambda x: x.english):
       words = list(words)
 
-      cluster_assignments = cluster(words)
+      cluster_assignments = cluster(words, linkage_method)
       clus_word = sorted(zip(cluster_assignments, words), key=lambda x: x[0])
 
       for cluster_num, cluster_items in groupby(clus_word, key=lambda x: x[0]):
         this_cluster_words = [word for num, word in cluster_items]
         print(eng + '\t' + '\t'.join([word.foreign + '/' + word.lang for word in this_cluster_words]), file=fout)
+
 
 
 import time
@@ -145,6 +174,32 @@ def make_qsubs(family, thresholds, output_dir):
     #os.remove(qsub_file)
 
 
+def plot(words, Z, link_method, _threshold):
+  import matplotlib
+  matplotlib.use('Agg')
+  from matplotlib import pyplot as plt
+  from scipy.cluster.hierarchy import dendrogram
+
+  name = 'weighted' if distance_func == weighted_dist else ''
+
+  plt.figure(figsize=(9, 6))
+  plt.title(link_method.capitalize() + ' Linkage', fontsize=28)
+  #plt.xlabel('distance')
+  plt.ylabel('Threshold\n(Normalized ' + name.capitalize() + ' LD)', fontsize=22)
+  dendrogram(
+    Z,
+    #color_threshold=threshold
+    #above_threshold_color='#cccccc',
+    #orientation='right',
+    leaf_rotation=0,  # rotates the x axis labels
+    leaf_font_size=20,  # font size for the x axis labels
+    leaf_label_func=lambda x: words[x].foreign + '\n(' + words[x].lang + ')'
+  )
+  #plt.axvline(x=threshold, c='k') # plot threshold line
+  plt.savefig('/home/wwu/figures/' + link_method + '-' + name + '.pdf')
+
+
+
 def read_args():
   import argparse
   parser = argparse.ArgumentParser()
@@ -154,19 +209,23 @@ def read_args():
   parser.add_argument('output_file')
   parser.add_argument('--lex', help='folder where .lex files are stored')
   parser.add_argument('--weights', help='weights like 0.1,0.2,0.2,0.3,-0.4')
+  parser.add_argument('--plot', action='store_true')
+  parser.add_argument('--linkage', help='linkage method for clustering, one of "single", "average", or "complete"')
   return parser.parse_args()
 
 if __name__ == '__main__':
   args = read_args()
 
   infile = args.input_file
-  distance_func = normalized_levenshtein_dist if args.distance == 'lev' else weighted_dist
+  distance_func = {'lev': normalized_levenshtein_dist, 'weighted': weighted_dist}[args.distance]
   threshold = args.threshold
   lex_folder = args.lex
   output_file = args.output_file
   if args.weights is not None:
     weights = [float(x) for x in args.weights.split(',')]
+  if args.plot:
+    cluster = cluster_and_plot
 
   table = read_combined_table(infile)
   table.sort(key=lambda x: x.english)
-  run(table, output_file)
+  run(table, args.linkage, output_file)

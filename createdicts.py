@@ -16,21 +16,22 @@ def get_lang_codes_dict():
 
 
 if __name__ == '__main__':
-  langs = [382,  # latin
-          211,  # french
-          666,  # spanish
-          579,  # portuguese
-          304,  # italian
-          101,  # catalan
-          610,  # romanian
+#  langs = [382,  # latin
+#          211,  # french
+#          666,  # spanish
+#          579,  # portuguese
+#          304,  # italian
+#          101,  # catalan
+#          610,  # romanian
+#  ]
+  langs = [738,  # turkish
+           54,   # azerbaijani
+           759,  # uzbek (north)
+           326,  # kazakh
+           1832,  # uyghur
+           737,  # turkmen
+           701,  # tatar
   ]
-#  langs = [738,  # turkish
-#           54,   # azerbaijani
-#           759,  # uzbek (north)
-#           326,  # kazakh
-#           457,  # uyghur
-#           737]  # turkmen
-#  langs = [1832]
 
   conn = sqlite3.connect('/export/a08/wwu/res/panlex_lite/db.sqlite')
   c = conn.cursor()

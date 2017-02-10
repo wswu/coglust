@@ -41,19 +41,22 @@ def make_singles(path):
         print(w, file=fout)
 
 
-def make_bitext():
+def make_bitext(splits=[60,20,20]):
   langs = get_langs()
   with open('pairs', 'w') as fout:
-    for src in langs:
-      for tgt in langs:
+    for tgt in langs:
+      assignment = assign_split(tgt)
+      for src in langs:
         if src != tgt:
           print(src + ' ' + tgt, file=fout)
-          split(src, tgt, assign_split(tgt))
+          split(src, tgt, splits, assigned=assignment)
 
 
 def assign_split(lang):
   unk_tgt = []
   has_tgt = []
+  if not os.path.exists('singles'):
+    os.mkdir('singles')
   with open('singles/' + lang) as fin:
     for index, word in enumerate(fin):
       if word.strip() != '':
@@ -68,7 +71,8 @@ def tr(word):
   return ' '.join(word)
 
 
-def split(src, tgt, assigned=None):
+# 60-20-20 splits by default
+def split(src, tgt, splits, assigned=None):
   with open('singles/' + src) as srcfile, open('singles/' + tgt) as tgtfile:
     src_words = srcfile.read().split('\n')
     tgt_words = tgtfile.read().split('\n')
@@ -83,10 +87,12 @@ def split(src, tgt, assigned=None):
     known_tgt = [(index, pair[0], pair[1]) for index, pair in bitext if pair[1] != '']
     unknown_tgt = [(index, pair[0], pair[1]) for index, pair in bitext if pair[1] == '']
 
-  # 60-20-20 split
-  train = known_tgt[: int(len(known_tgt) * 0.6)]
-  dev = known_tgt[int(len(known_tgt) * 0.6) : int(len(known_tgt) * 0.8)]
-  test = known_tgt[int(len(known_tgt) * 0.8) :]
+  split1 = splits[0] * 0.01
+  split2 = split1 + splits[1] * 0.01
+
+  train = known_tgt[: int(len(known_tgt) * split1)]
+  dev = known_tgt[int(len(known_tgt) * split1) : int(len(known_tgt) * split2)]
+  test = known_tgt[int(len(known_tgt) * split2) :]
 
   train_unk_src = [x for x in train if x[1] == '']  # x = (index, src word, tgt word)
   train_has_src = [x for x in train if x[1] != '']
@@ -135,5 +141,5 @@ def split(src, tgt, assigned=None):
 
 if __name__ == '__main__':
   make_singles(sys.argv[1])
-  make_bitext()
+  make_bitext(splits=[60,20,20])
 

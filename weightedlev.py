@@ -97,7 +97,7 @@ def convert_to_cost_functions(ins_map, del_map, sub_map, identity_sub_cost_zero 
     vowel = 0.2 if unidecode(a) in Vowels and unidecode(b) in Vowels else 1.0
     identity = 0.0 if a == b else 1.0
     punct = 0.15 if curses.ascii.ispunct(a[0]) and curses.ascii.ispunct(b[0]) else 1.0
-    return min (sub, backoff, base, vowel, identity, punct)
+    return min(sub, backoff, base, vowel, identity, punct)
 
   return ins_cost, del_cost, sub_cost
 
