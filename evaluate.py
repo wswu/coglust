@@ -21,7 +21,7 @@ def load_data(src, gold, output):
 
 
 def nlist2list(nlist):
-    return [x.split('(')[0] for x in nlist.split(',')]
+    return [despace(x.split('(')[0]) for x in nlist.split(',')]
 
 
 def despace(word):
@@ -35,10 +35,13 @@ def acc(data):
     total = 0.0
     for k, group in groupby(data, lambda x: x[0]):  # src word
         group = list(group)
-        golds = set(despace(x[1]) for x in group)
-        outs = set(x[2] for x in group)
 
-        assert(len(outs) == 1)  # should have the same output per input word
+        golds = set(despace(x[1]) for x in group)
+        if len(golds) == 1:  # comma separated, already grouped
+            golds = set(list(golds)[0].split(','))
+
+        outs = set(x[2] for x in group)
+        assert len(outs) == 1  # should have the same output per input word
 
         hyps = nlist2list(list(outs)[0])
 
