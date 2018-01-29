@@ -19,7 +19,16 @@ def to3(lang_code):
     except:
         return None
 
-Word = namedtuple('Word', ['foreign', 'english', 'lang', 'pos', 'meaning_id'])
+
+class Word:
+    def __init__(self, foreign, english, lang, pos, meaning_id):
+        self.foreign = foreign
+        self.english = english
+        self.lang = lang
+        self.pos = pos
+        self.meaning_id = meaning_id
+        self.backtrans = ''
+
 
 def extend_with_microlangs(langs):
     all_langs = list(langs)
@@ -60,21 +69,36 @@ def gather_from_panlex(langs):
     return entries
 
 
-def gather(langs, extra_dicts, output_file):
+def gather_from_panlex_backtrans(path):
+    entries = []
+    for lang in os.listdir(path):
+        with open(path + '/' + lang) as f:
+            reader = csv.reader(f, delimiter='\t', quoting=csv.QUOTE_NONE)
+            for e, f, backtrans, _trans_score, meaning_ids in reader:
+                word = Word(f, e, langcodes.macrolang(lang), None, meaning_ids)
+                word.backtrans = backtrans
+                entries.append(word)
+    return entries
+
+
+def gather(langs, extra_dicts, output_file, gathered_panlex_path=None):
     wik_words = gather_from_wiktionary(langs)
     print('wiktionary:', len(wik_words))
 
-    pan_words = gather_from_panlex(langs)
+    if gathered_panlex_path is None:
+        pan_words = gather_from_panlex(langs)
+    else:
+        pan_words = gather_from_panlex_backtrans(gathered_panlex_path)
     print('panlex:', len(pan_words))
 
     # gather words from extra dictionaries, must be in f \t e \t lang \t pos format
-#  extras = []
-#  for filename in extra_dicts:
-#    with open(filename) as fin:
-#      reader = csv.reader(fin, delimiter='\t', quoting=csv.QUOTE_NONE)
-#      for f, e, lang, pos in reader:
-#        extras.append(Word(f.strip(), e.strip(), langcodes.macrolang(lang), pos.strip(), None))
-#  print('extras:', len(extras))
+    #  extras = []
+    #  for filename in extra_dicts:
+    #    with open(filename) as fin:
+    #      reader = csv.reader(fin, delimiter='\t', quoting=csv.QUOTE_NONE)
+    #      for f, e, lang, pos in reader:
+    #        extras.append(Word(f.strip(), e.strip(), langcodes.macrolang(lang), pos.strip(), None))
+    #  print('extras:', len(extras))
 
     # merge results
     combined = wik_words + pan_words #+ extras
@@ -82,11 +106,26 @@ def gather(langs, extra_dicts, output_file):
     with open(output_file, 'w') as fout:
         for key, group in groupby(combined, lambda x: (x.english, x.foreign, x.lang)):
             group = list(group)
+            english, foreign, lang = key
+
             pos = set(normalize_pos(x.pos) for x in group if x.pos is not None and x.pos is not '')
+
+            backtrans = set(x.backtrans for x in group if x != '')
+            if '' in backtrans:
+                backtrans.remove('')
+            if len(backtrans) == 0:
+                backtrans = {english}
+            if len(backtrans) != 1:
+                print('more than one backtrans', backtrans, key)
+            backtrans = list(backtrans)[0]
+
+            if backtrans != english:
+                print(key, backtrans)
+
             meaning_id = set(x.meaning_id for x in group if x.meaning_id is not None)
 
-            foreign, english, lang = key
-            print(english, foreign, lang, '/'.join(meaning_id), '/'.join(pos),
+
+            print(english, foreign, lang, backtrans, '/'.join(pos), '/'.join(meaning_id),
                   sep='\t', file=fout)
 
 
@@ -97,12 +136,19 @@ def normalize_pos(pos):
     return pos
 
 
+def parseargs():
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument('langs_file')
+    parser.add_argument('output_file')
+    parser.add_argument('--gathered_panlex')
+    return parser.parse_args()
+
+
 def main():
-    if len(sys.argv) == 3:
-        langs = open(sys.argv[1]).read().strip().split('\n')
-        gather(langs, [], sys.argv[2])  # skip extra dictionaries for now
-    else:
-        print('Usage: gather.py LANGS_FILE OUTPUT_FILE')
+    args = parseargs()
+    langs = open(args.langs_file).read().strip().split('\n')
+    gather(langs, [], args.output_file, args.gathered_panlex)
 
 
 if __name__ == '__main__':
