@@ -20,7 +20,7 @@ with open(sys.argv[1]) as fin:
   langs = set()
 
   for line in fin:
-    arr = line.strip().split(',')
+    arr = line.strip().split('\t')
     src, tgt = arr[0][arr[0].rfind('/') + 1 :].split('-')
     langs.add(src)
     langs.add(tgt)
